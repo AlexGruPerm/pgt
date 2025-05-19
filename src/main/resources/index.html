@@ -1,0 +1,377 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>UP-Tests SPA Main page</title>
+    <script>
+        var globalSessionId;
+        var responseStatus;
+        var responseText;
+        var checkedTestId;
+        var checkedCommon;
+        var checkedTestIdJson;
+        var isTestsExecuting = 0;
+        var intervalTestsAgrState;
+
+        function myStopFunction() {
+          console.log("STOP checking..............");
+          clearInterval(intervalTestsAgrState);
+        }
+
+        function checkSuccessTest(testId){
+          const divTests = document.querySelector(`div[id="test_list"]`);
+          const checkBox = divTests.querySelectorAll(`span[id="test_${testId}"]`)[0];
+          checkBox.classList.value = "";
+          checkBox.className = 'test_state_success';
+        }
+
+        function setSpansUndefined(){
+          const divTests = document.querySelector(`div[id="test_list"]`);
+          const checkBox = divTests.querySelectorAll(`span[id^=test]`);
+          Array.from(checkBox).map(elm => elm.classList.value = "");
+          Array.from(checkBox).map(elm => elm.className = "test_state_undef");
+        }
+
+        function checkFailTest(testId){
+          const divTests = document.querySelector(`div[id="test_list"]`);
+          const checkBox = divTests.querySelectorAll(`span[id="test_${testId}"]`)[0];
+          checkBox.classList.value = "";
+          checkBox.className = 'test_state_failure';
+        }
+
+        async function getTestsState() {
+             console.log('-- request tests state ---------------------------------------------- SID = ',globalSessionId);
+             const curr_state = document.getElementById("test_current_state");
+               const response = await fetch(`check/`+globalSessionId, {method: "GET"});
+               responseStatus = response.status;
+                   if (responseStatus == 400) {
+                     console.log('-- error ----------------------------------------------');
+                     console.log('Response status = ',responseStatus);
+                     responseText = await response.text();
+                     curr_state.className = 'error_msg';
+                     curr_state.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+                     console.log('Response text = ',responseText);
+                     console.log('---------------------------------------------------------');
+                   } else {
+                     curr_state.classList.remove('error_msg');
+                     curr_state.innerHTML = "";
+                     responseText = await response.text();
+
+                     const response_json = JSON.parse(responseText);
+                     const t_total    = response_json.tests.total;
+                     const t_enabled  = response_json.tests.enabled;
+                     const t_disabled = response_json.tests.disabled;
+                     const t_executed = response_json.tests.executed;
+                     const t_success  = response_json.tests.success;
+                     const t_failure  = response_json.tests.failure;
+                     const t_percent  = Math.round((t_executed*100)/t_enabled);
+
+
+                     curr_state.innerHTML  = `<div>total : ${t_total} </div>`;
+                     curr_state.innerHTML += `<div>enabled : ${t_enabled} </div>`;
+                     curr_state.innerHTML += `<div>disabled : ${t_disabled} </div>`;
+                     curr_state.innerHTML += `<div>executed : ${t_executed} </div>`;
+                     curr_state.innerHTML += `<div>success : ${t_success} </div>`;
+                     curr_state.innerHTML += `<div>failure : ${t_failure} </div>`;
+                     curr_state.innerHTML += `<div>percent : ${t_percent} </div>`;
+
+                       console.log("success array - ",response_json.tests.successList);
+                       response_json.tests.successList.map(
+                         succElem => checkSuccessTest(succElem)//console.log(succElem)
+                       );
+                       response_json.tests.failureList.map(
+                         succElem => checkFailTest(succElem)//console.log(succElem)
+                       );
+
+                     curr_state.classList.remove('test_state_undef');
+                       if (t_executed < t_enabled) {
+                         curr_state.className = 'test_state_executing';
+                         console.log('set class - test_state_executing ');
+                       } else if (t_enabled == t_success) {
+                         console.log('set class - test_state_success ');
+                         curr_state.className = 'test_state_success';
+                       } else {
+                         curr_state.className = 'test_state_failure';
+                         console.log('set class - test_state_failure ');
+                       }
+
+                   }
+                   return response;
+        }
+
+
+        function getTestsAgrInfo() {
+          if (isTestsExecuting == 1) {
+          getTestsState();
+          }
+        }
+
+        async function getTestInfo(testId) {
+             console.log('-- request test info ---------------------------------------------- ID= ',testId);
+             const pre_json = document.getElementById("json_test_info");
+             const resp_message = document.getElementById("resp_message");
+               const response = await fetch(`test_info/`+globalSessionId+`/`+testId, {method: "GET"});
+               responseStatus = response.status;
+                   if (responseStatus == 400) {
+                     console.log('-- error ----------------------------------------------');
+                     console.log('Response status = ',responseStatus);
+                     responseText = await response.text();
+                     resp_message.className = 'error_msg';
+                     resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+                     console.log('Response text = ',responseText);
+                     console.log('---------------------------------------------------------');
+                   } else {
+                     resp_message.classList.remove('error_msg');
+                     resp_message.innerHTML = "";
+                     responseText = await response.text();
+                     //pre_json.textContent = JSON.stringify(JSON.parse(responseText), undefined, 2);
+                     pre_json.innerHTML = responseText;
+                   }
+                   return response;
+        }
+
+        async function test_info(test){
+          const testId = test.id.replace("test_","");
+          console.log('Info for test = ',testId);
+          const resultJson = await getTestInfo(testId);
+        }
+
+        function parse_response_populate_tests(tests_json){
+          globalSessionId = tests_json.session.id;
+          console.log("SessionId : ",globalSessionId);
+          const tests_container = document.getElementById("test_list");
+          tests_container.innerHTML = "";
+            for (test of tests_json.tests) {
+                tests_container.innerHTML += `<input type="checkbox" id="test_${test.id}" name="test_${test.id}" ><span id="test_${test.id}" onclick="test_info(this)" class="test_undefined">${test.name}</span><br/>`;
+            }
+        }
+
+        function loadFile(file){
+            return new Promise(resolve=>{
+                let reader = new FileReader()
+                reader.onload = function(event) {
+                    let data = event.target.result
+                    resolve(data)
+                }
+                reader.readAsText(file)
+            })
+        }
+
+        async function loadJsonTests() {
+             console.log('Begin loading new JSON file with tests into server.');
+             var file = fileupload.files[0];
+             var fileContent = await loadFile(file);
+             console.log('-- request ----------------------------------------------');
+             console.log(fileContent);
+             console.log('---------------------------------------------------------');
+               const response = await fetch(`load_test`, {
+                    method: "POST",
+                    headers: {
+                     'Accept': 'application/json',
+                     'Content-Type': 'application/json'
+                    },
+                    body: fileContent
+                  });
+               responseStatus = response.status;
+                   if (responseStatus == 400) {
+                     console.log('-- error ----------------------------------------------');
+                     console.log('Response status = ',responseStatus);
+                     responseText = await response.text();
+                     console.log('Response text = ',responseText);
+                     console.log('---------------------------------------------------------');
+                     return response;
+                   } else {
+                     return response.json();
+                   }
+        }
+
+        async function btnUploadTestFile() {
+             const resultJson = await loadJsonTests();
+             console.log('-- response ---------------------------------------------');
+             console.log(resultJson);
+             console.log('---------------------------------------------------------');
+             const resp_message = document.getElementById("resp_message");
+             const tests_container = document.getElementById("test_list");
+               if (responseStatus == 400) {
+                 tests_container.innerHTML = "";
+                 resp_message.className = 'error_msg';
+                 resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+               } else {
+                 resp_message.classList.remove('error_msg');
+                 resp_message.innerHTML = "";
+                 parse_response_populate_tests(resultJson);
+               }
+        }
+
+        async function startJsonTests() {
+             console.log('Send id of test to execting.');
+             console.log('-- request ----------------------------------------------');
+             console.log(checkedTestIdJson);
+             console.log('---------------------------------------------------------');
+             setSpansUndefined();
+
+               const response = await fetch(`start_test`, {
+                    method: "POST",
+                    headers: {
+                     'Accept': 'application/json',
+                     'Content-Type': 'application/json'
+                    },
+                    body: checkedTestIdJson
+                  });
+               const resp_message = document.getElementById("resp_message");
+               const tests_container = document.getElementById("test_list");
+               responseStatus = response.status;
+                   if (responseStatus == 400) {
+                     console.log('-- error ----------------------------------------------');
+                     myStopFunction();
+                     console.log('Response status = ',responseStatus);
+                     responseText = await response.text();
+                     console.log('Response text = ',responseText);
+                     resp_message.className = 'error_msg';
+                     resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+                     console.log('---------------------------------------------------------');
+                     return response;
+                   } else {
+                     myStopFunction();
+                     getTestsState();
+                     resp_message.classList.remove('error_msg');
+                     resp_message.innerHTML = "";
+                     return response.json();
+                   }
+        }
+
+        async function btnStartTests(){
+          console.log('-- start tests -------------------- isTestsExecuting=',isTestsExecuting);
+          const pre_json = document.getElementById("json_test_info");
+          pre_json.innerHTML = "";
+          const curr_state = document.getElementById("test_current_state");
+          curr_state.innerHTML = "";
+          const tests_container = document.getElementById("test_list");
+          checkedTestId = Array.from(tests_container.querySelectorAll("input[type=checkbox]:checked"))
+            .map((elem) => parseInt(elem.id.replace("test_","")));
+          checkedCommon = "{\"sid\" : \"" + globalSessionId + "\" , \"ids\" : "+JSON.stringify(checkedTestId)+"}";
+          console.log("checkedCommon = ",checkedCommon);
+          checkedTestIdJson = JSON.parse(JSON.stringify(checkedCommon));
+          console.log("checkedTestIdJson = ",checkedTestIdJson);
+             if (checkedTestId.length) {
+               console.log("START checking..............");
+               isTestsExecuting = 1;
+               intervalTestsAgrState = setInterval(getTestsAgrInfo, 200);
+             }
+             const resultJson = await startJsonTests();
+             console.log('-- response -------------------------------- isTestsExecuting =',isTestsExecuting);
+             console.log(resultJson);
+             isTestsExecuting = 0;
+             console.log('------------------------------------------- isTestsExecuting =',isTestsExecuting);
+        }
+
+        function btnSelectAll(){
+           console.log('select all tests');
+           const tests_container = document.getElementById("test_list");
+           Array.from(tests_container.querySelectorAll("input[type=checkbox]"))
+             .map((elem) => elem.checked = true)
+        }
+
+        function btnUnselectAll(){
+          console.log('unselect all tests');
+          const tests_container = document.getElementById("test_list");
+          Array.from(tests_container.querySelectorAll("input[type=checkbox]"))
+             .map((elem) => elem.checked = false)
+        }
+
+    </script>
+    <style type="text/css">
+<!--
+body {
+	color:#000000;
+	margin:0;
+}
+.label {
+    width: 180px;
+    height: 50px;
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    display: block;
+    font: 14px/50px Tahoma;
+    transition: all 0.18s ease-in-out;
+    border: 1px solid #333;
+    color: #333;
+}
+
+.sel-button-container {
+    border: 3px solid #fff;
+    padding: 20px;
+}
+
+.select_label {
+    width: 120px;
+    height: 35px;
+    border-radius: 3px;
+    text-align: center;
+    cursor: pointer;
+    display: block;
+    font: 14px/50px Tahoma;
+    border: 1px solid #333;
+    color: #333;
+    float: left;
+}
+
+.test_container { border:1px solid #ccc; width:100%; height: 500px; overflow-y: scroll; top: 0;  left: 0;}
+
+.test_undefined{color: black;}
+.test_fail{color: #E6ACAC;}
+.test_success{color: #A7D9A3;}
+.test_executing{color: grey;}
+
+.error_msg{color: red; font-size: 16px;}
+
+.pre_json{
+    height: auto;
+    max-height: 740px;
+    overflow: auto;
+    word-break: normal !important;
+    word-wrap: normal !important;
+    white-space: pre !important;
+}
+
+span:hover {
+    background-color: #DCDCDC;
+}
+
+.test_state_undef {background-color: #D3D3D3;}
+.test_state_executing {background-color: #F9E79F;}
+.test_state_success {background-color: #8FBC8F;}
+.test_state_failure {background-color: #E6ACAC;}
+
+-->
+</style>
+</head>
+<body>
+<table width="100%" border="2">
+    <tr>
+        <td width="60%" height="200px">
+            <input id="fileupload" type="file" accept=".json" name="fileupload" />
+            <br><br>
+            <div id="btn_upload_test_file" onclick="btnUploadTestFile()"  class="label">send json file</div>
+                <div class="sel-button-container">
+                    <div id="btn_select_all" onclick="btnSelectAll()" class="select_label">Select all</div>
+                    <div id="btn_unselect_all" onclick="btnUnselectAll()" class="select_label">Unselect all</div>
+                    <div id="btn_start_tests" onclick="btnStartTests()" class="select_label">Start tests</div>
+                </div><br>
+            <div id="resp_message"></div>
+        </td>
+        <td>
+            <div id="test_current_state" class="test_state_undef">tests current state.</div>
+        </td>
+    </tr>
+    <tr>
+        <td height="750px" >
+            <div id="test_list" class="test_container"></div>
+        </td>
+        <td>
+            <pre id="json_test_info" class="pre_json"> Single test results.</pre>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
