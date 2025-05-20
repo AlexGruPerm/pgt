@@ -197,31 +197,14 @@ import java.sql.{Connection, ResultSet}
     conn <- jdbc.pgConnection(testInRepo.id)
     _ <- ZIO.logInfo(s" ----> sid=[$sid] tests [${testInRepo.id}] isOpened Connection = ${!conn.sess.isClosed}")
     _ <- (testInRepo.call_type,testInRepo.ret_type) match {
-      case (_: Select_function.type, _: Cursor.type) => exec_select_function_cursor(conn,testInRepo) @@
-        countAllRequests("select_function_cursor")
-      case (_: Select_function.type, _: Integer_value.type) => exec_select_function_int(conn,testInRepo) @@
-        countAllRequests("select_function_integer_value")
-      case (_: Func_inout_cursor.type , _: Cursor.type) => exec_func_inout_cursor(conn,testInRepo) @@
-        countAllRequests("func_inout_cursor")
-      case (_: Select.type, _: Dataset.type) => exec_select_dataset(conn,testInRepo) @@
-        countAllRequests("select_dataset")
-      case (_: Dml_sql.type, _: Affected_rows.type) => exec_dml_sql(conn,testInRepo) @@
-        countAllRequests("dml_sql")
+      case (_: Select_function.type, _: Cursor.type) => exec_select_function_cursor(conn,testInRepo)
+      case (_: Select_function.type, _: Integer_value.type) => exec_select_function_int(conn,testInRepo)
+      case (_: Func_inout_cursor.type , _: Cursor.type) => exec_func_inout_cursor(conn,testInRepo)
+      case (_: Select.type, _: Dataset.type) => exec_select_dataset(conn,testInRepo)
+      case (_: Dml_sql.type, _: Affected_rows.type) => exec_dml_sql(conn,testInRepo)
       case _ => ZIO.unit
     }
   } yield ()
-
-  private val execInRunCount = Metric.counterInt("call_exec_in_run").fromConst(1)
-
-  def getExecInRunCount: UIO[Double] = for {
-    c <- execInRunCount.value
-  } yield c.count
-
-  def countAllRequests(method: String) =
-    Metric.counterInt("count_all_exec").fromConst(1)
-      .tagged(
-        MetricLabel("method", method)
-      )
 
   def run(): ZIO[Any, Exception, Unit] = for {
       testsSetOpt <- tr.lookup(sid)
@@ -230,7 +213,7 @@ import java.sql.{Connection, ResultSet}
           ZIO.logInfo(s" Begin tests set execution for SID = $sid") *>
           ZIO.foreachDiscard(testsSet.optListTestInRepo.getOrElse(List[Test]()).filter(_.isEnabled == true)) {
             testId: Test =>
-              exec(testId).provide(ZLayer.succeed(testsSet.meta), jdbcSessionImpl.layer) @@ execInRunCount
+              exec(testId).provide(ZLayer.succeed(testsSet.meta), jdbcSessionImpl.layer)
           }
         case None => ZIO.unit
       }
