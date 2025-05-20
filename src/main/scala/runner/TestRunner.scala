@@ -192,16 +192,6 @@ import java.sql.{Connection, ResultSet}
             }.as(TestExecutionResult(e.getClass.getName, e.getMessage))
         }.orDie
 
-  /**
-   private def catchAllErrs(eff: ZIO[Any, Throwable, TestExecutionResult]): UIO[TestExecutionResult] = for {
-   effAfterCatch <- eff.catchAllDefect {
-   case e: Exception => ZIO.logError(e.getMessage).as(TestExecutionResult(e.getClass.getName,e.getMessage))
-   }.catchAll {
-   e: Throwable => ZIO.logError(e.getMessage).as(TestExecutionResult(e.getClass.getName,e.getMessage))
-   }
-   } yield effAfterCatch
-  */
-
   private def exec(testInRepo: Test): ZIO[TestsMeta with jdbcSession, Exception, Unit] = for {
     jdbc <- ZIO.service[jdbcSession]
     conn <- jdbc.pgConnection(testInRepo.id)

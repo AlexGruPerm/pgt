@@ -20,7 +20,14 @@ import common.types.Columns
                                  execMs: Long,
                                  cols : Columns,
                                  rowCount: Int,
-                                 err: Option[TestExecutionException] = None)
+                                 err: Option[TestExecutionException] = None){
+    println("~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    err match {
+      case Some(e) => println(s"error = ${e.exceptionType} - ${e.exceptionMsg}")
+      case None => println("no error")
+    }
+    println("~~~~~~~~~~~~~~~~~~~~~~~~~~")
+}
 
   object TestExecutionResult {
     def apply(): TestExecutionResult =

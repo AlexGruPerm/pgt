@@ -86,14 +86,14 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
     def check(testRes: TestExecutionResult):SucCondElement = {
       val (checkConditionRes,testResVal): (Boolean,Option[Long]) =
         condition match {
-        case Rows_gt => (checkValue.getOrElse(0) < testRes.rowCount,Some(testRes.rowCount))
-        case Rows_lt => (checkValue.getOrElse(0) > testRes.rowCount,Some(testRes.rowCount))
-        case Rows_eq => (checkValue.getOrElse(0) == testRes.rowCount,Some(testRes.rowCount))
-        case Rows_ne => (checkValue.getOrElse(0) != testRes.rowCount,Some(testRes.rowCount))
-        case Exec_time_ms  => (testRes.execMs <= checkValue.getOrElse(0),Some(testRes.execMs))
-        case Fetch_time_ms => (testRes.fetchMs <= checkValue.getOrElse(0),Some(testRes.fetchMs))
-        case Full_time_ms  => (testRes.totalMs <= checkValue.getOrElse(0),Some(testRes.totalMs))
-        case Fields_exists  => (fields.getOrElse(List[String]()).forall(testRes.cols.map(cls => cls._1).contains),
+        case Rows_gt       => (testRes.err.isEmpty && checkValue.getOrElse(0) < testRes.rowCount,Some(testRes.rowCount))
+        case Rows_lt       => (testRes.err.isEmpty && checkValue.getOrElse(0) > testRes.rowCount,Some(testRes.rowCount))
+        case Rows_eq       => (testRes.err.isEmpty && checkValue.getOrElse(0) == testRes.rowCount,Some(testRes.rowCount))
+        case Rows_ne       => (testRes.err.isEmpty && checkValue.getOrElse(0) != testRes.rowCount,Some(testRes.rowCount))
+        case Exec_time_ms  => (testRes.err.isEmpty && testRes.execMs <= checkValue.getOrElse(0),Some(testRes.execMs))
+        case Fetch_time_ms => (testRes.err.isEmpty && testRes.fetchMs <= checkValue.getOrElse(0),Some(testRes.fetchMs))
+        case Full_time_ms  => (testRes.err.isEmpty && testRes.totalMs <= checkValue.getOrElse(0),Some(testRes.totalMs))
+        case Fields_exists => (testRes.err.isEmpty && fields.getOrElse(List[String]()).forall(testRes.cols.map(cls => cls._1).contains),
           Some(1))
         case Exec_exception => (testRes.err.fold(false)(_ => true),Some(1))
         }
@@ -298,7 +298,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
                   "#FF4500;"),
                   td(
                     sc.condition match {
-                      case Fields_exists => testRes.cols.map(_._1).mkString("</br>")
+                      case Fields_exists => Html.raw(testRes.cols.map(_._1).mkString("</br>"))
                       case Exec_exception =>
                         testRes.err.fold("no exception but expected")(_ => "exception exist, it's OK")
                       case _ => sc.execResultValue.getOrElse(0).toString
@@ -307,7 +307,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
                   td(sc.condition.toString),
                   td(
                     sc.condition match {
-                      case Fields_exists => sc.fields.getOrElse(List[String]()).mkString("</br>")
+                      case Fields_exists => Html.raw(sc.fields.getOrElse(List[String]()).mkString("</br>"))
                       case Exec_exception => "true"
                       case _ => sc.checkValue.toString
                     }
