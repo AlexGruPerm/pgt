@@ -20,14 +20,9 @@ import common.types.Columns
                                  execMs: Long,
                                  cols : Columns,
                                  rowCount: Int,
-                                 err: Option[TestExecutionException] = None){
-    println("~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    err match {
-      case Some(e) => println(s"error = ${e.exceptionType} - ${e.exceptionMsg}")
-      case None => println("no error")
-    }
-    println("~~~~~~~~~~~~~~~~~~~~~~~~~~")
-}
+                                 err: Option[TestExecutionException] = None,
+                                 intVal: Int = 0
+                                )
 
   object TestExecutionResult {
     def apply(): TestExecutionResult =
@@ -41,6 +36,10 @@ import common.types.Columns
     def apply(timings: CallTimings, cols: Columns, rowCount: Int): TestExecutionResult =
       TestExecutionResult(timings.tFetch - timings.tBegin, timings.tFetch - timings.tExec,
         timings.tExec - timings.tBegin, cols, rowCount)
+
+    def apply(timings: CallTimings, cols: Columns, rowCount: Int, iVal: Int): TestExecutionResult =
+      TestExecutionResult(timings.tFetch - timings.tBegin, timings.tFetch - timings.tExec,
+        timings.tExec - timings.tBegin, cols, rowCount, intVal = iVal)
 
   }
 

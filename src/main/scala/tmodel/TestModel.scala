@@ -70,6 +70,20 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
       override def toString: String = "is exception exist "
     }
 
+    case object Intval_gt  extends SucCond{
+      override def toString: String = "Intval >"
+    }
+    case object Intval_lt  extends SucCond{
+      override def toString: String = "Intval <"
+    }
+    case object Intval_eq  extends SucCond{
+      override def toString: String = "Intval ="
+    }
+    case object Intval_ne  extends SucCond{
+      override def toString: String = "Intval <>"
+    }
+
+
   sealed trait TestState
     case object testStateUndefined extends TestState
     case object testStateSuccess extends TestState
@@ -90,6 +104,10 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
         case Rows_lt       => (testRes.err.isEmpty && checkValue.getOrElse(0) > testRes.rowCount,Some(testRes.rowCount))
         case Rows_eq       => (testRes.err.isEmpty && checkValue.getOrElse(0) == testRes.rowCount,Some(testRes.rowCount))
         case Rows_ne       => (testRes.err.isEmpty && checkValue.getOrElse(0) != testRes.rowCount,Some(testRes.rowCount))
+        case Intval_gt       => (testRes.err.isEmpty && checkValue.getOrElse(0) < testRes.intVal,Some(testRes.intVal))
+        case Intval_lt       => (testRes.err.isEmpty && checkValue.getOrElse(0) > testRes.intVal,Some(testRes.intVal))
+        case Intval_eq       => (testRes.err.isEmpty && checkValue.getOrElse(0) == testRes.intVal,Some(testRes.intVal))
+        case Intval_ne       => (testRes.err.isEmpty && checkValue.getOrElse(0) != testRes.intVal,Some(testRes.intVal))
         case Exec_time_ms  => (testRes.err.isEmpty && testRes.execMs <= checkValue.getOrElse(0),Some(testRes.execMs))
         case Fetch_time_ms => (testRes.err.isEmpty && testRes.fetchMs <= checkValue.getOrElse(0),Some(testRes.fetchMs))
         case Full_time_ms  => (testRes.err.isEmpty && testRes.totalMs <= checkValue.getOrElse(0),Some(testRes.totalMs))
@@ -97,9 +115,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
           Some(1))
         case Exec_exception => (testRes.err.fold(false)(_ => true),Some(1))
         }
-      // Если testRes [TestExecutionResult] err содержит Some, то условия не проверяем
       this.copy(execResultValue = testResVal, conditionResult = Some(checkConditionRes))
-
     }
 
     /**
@@ -213,7 +229,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
     }
 
     def getTestAsHtml: Html =
-      div(
+      div(css := "div_res",
         table(
           borderAttr := "1px solid black",
           css := (if (testState == testStateFailure)
@@ -366,6 +382,10 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
       case "full_time_ms" => Full_time_ms
       case "fields_exists" => Fields_exists
       case "exec_exception" => Exec_exception
+      case "intval_gt" => Intval_gt
+      case "intval_lt" => Intval_lt
+      case "intval_eq" => Intval_eq
+      case "intval_ne" => Intval_ne
       case anyValue => throw new Exception(s"Invalid value in field inside success_condition = $anyValue")
     }
 

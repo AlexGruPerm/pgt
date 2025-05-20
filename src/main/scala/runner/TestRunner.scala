@@ -103,12 +103,19 @@ import java.sql.{Connection, ResultSet}
     execDbCall: ZIO[Any, Throwable, TestExecutionResult] = ZIO.attemptBlocking {
       val stmt = connection.createStatement()
       val tBegin = System.currentTimeMillis
-      val pgrs: ResultSet = stmt.executeQuery(testInRepo.call);
+      val pgrs: ResultSet = stmt.executeQuery(testInRepo.call)
       val tExec = System.currentTimeMillis
       val res: TestExecutionResult = {
         val (cols: Columns, rows: ListRows) = columnsRows(pgrs)
+
+        val optIntValue: Option[Int] =
+          if (cols.size == 1 && rows.size == 1 && rows.head.size == 1)
+            Some(rows.head.head.toInt)
+          else
+            None
+
         val tFetch = System.currentTimeMillis
-        TestExecutionResult(CallTimings(tBegin,tExec,tFetch), cols, rows.size)
+        TestExecutionResult(CallTimings(tBegin,tExec,tFetch), cols, rows.size, iVal = optIntValue.getOrElse(0))
       }
       makeCommit(testInRepo.use_commit, connection)
       stmt.close()
@@ -126,18 +133,20 @@ import java.sql.{Connection, ResultSet}
       val stmt = connection.createStatement()
       val tBegin = System.currentTimeMillis
       val hasResultSet = stmt.execute(testInRepo.call)
-      val rowsAffected: Int =
-        if (hasResultSet) {
-          0// Обрабатываем результат для SELECT, если в нем вызывается функция
+      val rowsAffected: Int = {
+        if (!hasResultSet) {
+          stmt.getUpdateCount
         } else {
-          stmt.getUpdateCount // Получаем количество изменённых строк для INSERT/UPDATE/DELETE
+          0 // Получаем количество изменённых строк для INSERT/UPDATE/DELETE
         }
+      }
+      println(s"rowsAffected = $rowsAffected")
       val tExec = System.currentTimeMillis
       val res: TestExecutionResult = {
         //val (cols: Columns, rows: ListRows) = (IndexedSeq[Column](),List[IndexedSeq[String]]())
         val cols: Columns = IndexedSeq[Column]()
         val tFetch = System.currentTimeMillis
-        TestExecutionResult(CallTimings(tBegin,tExec,tFetch), cols, rowsAffected)
+        TestExecutionResult(CallTimings(tBegin,tExec,tFetch), cols, rowCount = rowsAffected)
       }
       makeCommit(testInRepo.use_commit, connection)
       stmt.close()

@@ -68,40 +68,39 @@ object WebUiApp {
   def loadTests(req: Request): ZIO[ImplTestsRepo, Exception, Response] =
     for {
       tr <- ZIO.service[ImplTestsRepo]
-/*      bodyAsStr <- req.body.asString.catchAll{
-        case e: Exception => ZIO.logError(s"updb-0 error parsing input file with tests : ${e.getMessage}") *>
-          ZIO.succeed("{}")
+
+      bodyAsStr <- req.body.asString.catchAll{
+        case e: Exception => ZIO.logError(s"pgt-0 error parsing input file with tests : ${e.getMessage}").as("{}")
       }
+      //todo: remove lines
+      /*
       _ <- ZIO.logInfo(s"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~") *>
         ZIO.logInfo(s"bodyAsStr = $bodyAsStr") *>
         ZIO.logInfo(s"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")*/
-
-      u <- req.body.asString.map(_.fromJson[TestModel])
-        .catchAllDefect{
-          case e: Exception => ZIO.logError(s"updb-1 error parsing input file with tests : ${e.getMessage}").as(Left(e.getMessage))
-        }
-        .catchAll{
-          case e: Exception => ZIO.logError(s"updb-2 error parsing input file with tests : ${e.getMessage}").as(Left(e.getMessage))
-        }
-
+      u <- ZIO.attempt(bodyAsStr.fromJson[TestModel]).either
       resp <- u match {
-        case Left(exp_str) =>  ZioResponseMsgBadRequest(exp_str)
-        case Right(testsWithMeta) =>
-          tr.create(testsWithMeta).flatMap { sid =>
-            ZIO.logInfo(s"SID = $sid") *>
-              tr.testsList(sid).map {
-                optTests =>
-                  Response.json(RespTestModel(
-                    Session(sid),
-                    optTests.map { trp => trp.map { testInRepo =>
-                      RespTest(testInRepo.id, s"[${testInRepo.id}] ${testInRepo.name}") } }
-                  ).toJson)
-              }
-          }.foldZIO(
-            error   => ZIO.logError(s"updb-3 error parsing input file with tests : ${error.getMessage}") *>
-              ZioResponseMsgBadRequest(error.getMessage),
-            success => ZIO.succeed(success)
-          )
+        case Left(exp_str) => ZIO.logError(s"Error in input json - ${exp_str.getMessage}") *>
+          ZioResponseMsgBadRequest(exp_str.getMessage)
+        case Right(testsWithMetaE) =>
+          testsWithMetaE match {
+            case Left(str) => ZioResponseMsgBadRequest(str)
+            case Right(testsWithMeta) => tr.create(testsWithMeta).flatMap { sid =>
+              ZIO.logInfo(s"SID = $sid") *>
+                tr.testsList(sid).map {
+                  optTests =>
+                    Response.json(RespTestModel(
+                      Session(sid),
+                      optTests.map { trp => trp.map { testInRepo =>
+                        RespTest(testInRepo.id, s"[${testInRepo.id}] ${testInRepo.name}") } }
+                    ).toJson)
+                }
+            }.foldZIO(
+              error   => ZIO.logError(s"pgt-3 error parsing input file with tests : ${error.getMessage}") *>
+                ZioResponseMsgBadRequest(error.getMessage),
+              success => ZIO.succeed(success)
+            )
+          }
+
       }
     } yield resp
 

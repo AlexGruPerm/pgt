@@ -343,6 +343,20 @@ span:hover {
 .test_state_success {background-color: #8FBC8F;}
 .test_state_failure {background-color: #E6ACAC;}
 
+.td_res {
+  position: relative;
+  padding: 0;
+}
+
+.div_res{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 -->
 </style>
 </head>
@@ -368,7 +382,7 @@ span:hover {
         <td height="750px" >
             <div id="test_list" class="test_container"></div>
         </td>
-        <td>
+        <td class="td_res">
             <pre id="json_test_info" class="pre_json"> Single test results.</pre>
         </td>
     </tr>
