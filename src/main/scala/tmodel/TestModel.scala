@@ -37,6 +37,10 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
     case object Integer_value extends RetType{
       override def toString: String = "integer_value"
     }
+    case object Unknown extends RetType{
+      override def toString: String = "Unknown"
+    }
+    //todo: remove
     case object Affected_rows extends RetType{
       override def toString: String = "affected_rows"
     }
@@ -138,7 +142,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
   case class Test( id: TestID,
                    name: String,
                    call_type: CallType,
-                   ret_type: RetType,
+                   ret_type: RetType = Unknown,
                    use_commit: Option[Boolean],
                    call: String,
                    success_condition: Option[List[SucCondElement]],
@@ -182,11 +186,11 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
             case _: Cursor.type => None
             case _ => Some(s"TestID=[$id] For call type (func_inout_cursor) is only applicable ret_type: cursor ")
           }
-        case _:Dml_sql.type =>
+/*        case _:Dml_sql.type =>
           rt match {
             case _: Affected_rows.type => None
             case _ => Some(s"TestID=[$id] For call type (dml_sql) is only applicable ret_type: affected_rows ")
-          }
+          }*/
         case _ => None
       }
     }
@@ -367,7 +371,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
       case "cursor" => Cursor
       case "dataset" => Dataset
       case "integer_value" => Integer_value
-      case "affected_rows" => Affected_rows
+      //case "affected_rows" => Affected_rows
       case anyValue => throw new Exception(s"Invalid value in field ret_type = $anyValue")
     }
 

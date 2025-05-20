@@ -5,7 +5,7 @@ import common.types.SessionId
 import data.ImplTestsRepo
 import db.{jdbcSession, jdbcSessionImpl, pgSess}
 import org.postgresql.jdbc.PgResultSet
-import tmodel.{Test, TestsMeta, Affected_rows, Cursor, Dataset, Dml_sql, Func_inout_cursor, Integer_value, Select, Select_function}
+import tmodel.{Test, TestsMeta/*, Affected_rows*/, Cursor, Dataset, Dml_sql, Func_inout_cursor, Integer_value, Select, Select_function}
 import zio.metrics.{Metric, MetricLabel}
 import zio.{UIO, ZIO, ZLayer}
 import common.types._
@@ -210,7 +210,7 @@ import java.sql.{Connection, ResultSet}
       case (_: Select_function.type, _: Integer_value.type) => exec_select_function_int(conn,testInRepo)
       case (_: Func_inout_cursor.type , _: Cursor.type) => exec_func_inout_cursor(conn,testInRepo)
       case (_: Select.type, _: Dataset.type) => exec_select_dataset(conn,testInRepo)
-      case (_: Dml_sql.type, _: Affected_rows.type) => exec_dml_sql(conn,testInRepo)
+      case (_: Dml_sql.type, _/*: Affected_rows.type*/) => exec_dml_sql(conn,testInRepo)
       case _ => ZIO.unit
     }
   } yield ()
