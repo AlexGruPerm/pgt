@@ -5,7 +5,7 @@ import common.types.SessionId
 import data.TestRepoTypes.TestID
 import tmodel.{Test, TestModel}
 
-import scala.collection.mutable
+// Removed scala.collection.mutable import
 import zio.{UIO, _}
 
   object TestRepoTypes{
@@ -58,17 +58,19 @@ import zio.{UIO, _}
 
 }
 
-  case class ImplTestsRepo(ref: Ref[mutable.Map[SessionId, TestModelRepo]]) extends TestsRepo {
+  // Changed mutable.Map to immutable Map
+  case class ImplTestsRepo(ref: Ref[Map[SessionId, TestModelRepo]]) extends TestsRepo {
 
     def create(testModel: TestModel): Task[SessionId] = for {
       sid <- Random.nextUUID.map(_.toString)
-      _ <- ref.update(test => test.concat(List(sid -> TestModelRepo(testModel))))
+      // Updated to use immutable map operation
+      _ <- ref.update(map => map + (sid -> TestModelRepo(testModel)))
     } yield sid
 
     def lookup(sid: SessionId): UIO[Option[TestModelRepo]] =
-      ref.get.map(_.get(sid))
+      ref.get.map(_.get(sid)) // Should work fine with immutable Map
 
-    def elementsCnt: UIO[Int] = ref.get.map(_.size)
+    def elementsCnt: UIO[Int] = ref.get.map(_.size) // Should work fine with immutable Map
 
     def testsList(sid: SessionId): UIO[Option[List[Test]]] = for {
       test <- lookup(sid)
@@ -86,52 +88,56 @@ import zio.{UIO, _}
       res <- ZIO.succeed(res)
     } yield res
 
-    def updateTestWithResults(sid: SessionId, testWithResults: Test): UIO[Unit] = for {
-      test <- lookup(sid)
-      _ <- test.fold(ZIO.unit) { testsSet =>
-        ref.update {
-          tests =>
-            tests.concat(
-              List(sid -> TestModelRepo(testsSet.meta, testsSet.optListTestInRepo).updateOneTest(testWithResults))
-            )
+    def updateTestWithResults(sid: SessionId, testWithResults: Test): UIO[Unit] =
+      ref.modify { currentMap =>
+        currentMap.get(sid) match {
+          case Some(repo) =>
+            val updatedRepo = repo.updateOneTest(testWithResults)
+            (Unit, currentMap.updated(sid, updatedRepo))
+          case None =>
+            (Unit, currentMap) // No change
         }
-      }
-    } yield ()
+      }.unit
 
-    def enableTest(sid: SessionId, testId: TestID): UIO[Unit] = for {
-      test <- lookup(sid)
-      _ <- test.fold(ZIO.unit) { testsSet =>
-        ref.update {
-          tests =>
-            tests.concat(
-              List(sid -> TestModelRepo(testsSet.meta, testsSet.optListTestInRepo).enableOneTest(testId))
-            )
-        }}
-    } yield ()
+    def enableTest(sid: SessionId, testId: TestID): UIO[Unit] =
+      ref.modify { currentMap =>
+        currentMap.get(sid) match {
+          case Some(repo) =>
+            val updatedRepo = repo.enableOneTest(testId)
+            (Unit, currentMap.updated(sid, updatedRepo))
+          case None =>
+            (Unit, currentMap)
+        }
+      }.unit
 
-    def disableTest(sid: SessionId, testId: TestID): UIO[Unit] = for {
-      test <- lookup(sid)
-      _ <- test.fold(ZIO.unit) { testsSet =>
-        ref.update {
-          tests =>
-            tests.concat(
-              List(sid -> TestModelRepo(testsSet.meta, testsSet.optListTestInRepo).disableOneTest(testId))
-            )
-        }}
-    } yield ()
+    def disableTest(sid: SessionId, testId: TestID): UIO[Unit] =
+      ref.modify { currentMap =>
+        currentMap.get(sid) match {
+          case Some(repo) =>
+            val updatedRepo = repo.disableOneTest(testId)
+            (Unit, currentMap.updated(sid, updatedRepo))
+          case None =>
+            (Unit, currentMap)
+        }
+      }.unit
 
-    def disableAllTestAndClearExecRes(sid: SessionId): UIO[Unit] = for {
-      testModelRepo <- lookup(sid)
-      _ <- testModelRepo.fold(ZIO.unit) { test =>
-        ZIO.foreachDiscard(test.optListTestInRepo.getOrElse(List[Test]())) { t =>
-          disableTest(sid, t.id)
-        }}
-    } yield ()
+    def disableAllTestAndClearExecRes(sid: SessionId): UIO[Unit] =
+      ref.modify { currentMap =>
+        currentMap.get(sid) match {
+          case Some(repo) =>
+            val testsToDisable = repo.optListTestInRepo.getOrElse(List.empty)
+            val fullyDisabledRepo = testsToDisable.foldLeft(repo)((currentRepo, test) => currentRepo.disableOneTest(test.id))
+            (Unit, currentMap.updated(sid, fullyDisabledRepo))
+          case None =>
+            (Unit, currentMap)
+        }
+      }.unit
   }
 
   object ImplTestsRepo {
     def layer: ZLayer[Any, Nothing, ImplTestsRepo] =
       ZLayer.fromZIO(
-        Ref.make(mutable.Map.empty[SessionId, TestModelRepo]).map(new ImplTestsRepo(_))
+        // Changed to immutable Map
+        Ref.make(Map.empty[SessionId, TestModelRepo]).map(new ImplTestsRepo(_))
       )
   }

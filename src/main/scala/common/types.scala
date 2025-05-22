@@ -52,42 +52,49 @@ import common.types.Columns
 
     //todo: In all 3 methods don't do update in case of test in testInRepo not affected
     def enableOneTest(testId: TestID): TestModelRepo = {
-      val updatedTests: Option[List[Test]] = optListTestInRepo.map{
-        tr => tr.map {t=>
-          if (t.id == testId) {
-            t.copy(isEnabled = true)
-          } else
-            t
-        }}
-      this.copy(optListTestInRepo = updatedTests)
+      modifyTestById(testId, t => t.copy(isEnabled = true))
     }
 
-    //todo: Need refactoring to eliminate if
-    def updateOneTest(testWithResults: Test): TestModelRepo ={
-      val updatedTests: Option[List[Test]] = optListTestInRepo.map{
-        listTestsInRepo => listTestsInRepo.collect { case testInRepo =>
-          if (testInRepo.id == testWithResults.id)
-            testWithResults
-          else
+    // Private helper method to modify a test by ID
+    private def modifyTestById(testId: TestID, transform: Test => Test): TestModelRepo = {
+      var testWasChanged = false
+      val updatedTestsOpt: Option[List[Test]] = optListTestInRepo.map { listTestsInRepo =>
+        listTestsInRepo.map { testInRepo =>
+          if (testInRepo.id == testId) {
+            val transformedTest = transform(testInRepo)
+            if (transformedTest != testInRepo) { // Check if the test actually changed
+              testWasChanged = true
+            }
+            transformedTest
+          } else {
             testInRepo
-        }}
-      this.copy(optListTestInRepo = updatedTests)
+          }
+        }
+      }
+      // Only create a new TestModelRepo if a test was actually changed or if optListTestInRepo was None initially
+      if (testWasChanged || (optListTestInRepo.isDefined && updatedTestsOpt.isDefined && optListTestInRepo != updatedTestsOpt) ) {
+        this.copy(optListTestInRepo = updatedTestsOpt)
+      } else {
+        this
+      }
+    }
+
+    //todo: Need refactoring to eliminate if - Done
+    def updateOneTest(testWithResults: Test): TestModelRepo = {
+      // Using modifyTestById, the transformation is to simply replace the test.
+      // The check for whether the test actually changed is handled within modifyTestById.
+      modifyTestById(testWithResults.id, _ => testWithResults)
     }
 
     def disableOneTest(testId: TestID): TestModelRepo = {
-      val updatedTests: Option[List[Test]] = optListTestInRepo.map{
-        tr => tr.map {t=>
-          if (t.id == testId)
-            t.copy(isEnabled = false,
-              success_condition = uncheckConditions(t.success_condition),
-              isExecuted = false,
-              testState = testStateUndefined,
-              testRes = TestExecutionResult()
-            )
-          else
-            t
-        }}
-      this.copy(optListTestInRepo = updatedTests)
+      modifyTestById(testId, t =>
+        t.copy(isEnabled = false,
+          success_condition = uncheckConditions(t.success_condition),
+          isExecuted = false,
+          testState = testStateUndefined,
+          testRes = TestExecutionResult()
+        )
+      )
     }
 
   }

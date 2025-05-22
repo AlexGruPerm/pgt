@@ -20,6 +20,7 @@ ThisBuild / scalaVersion := "2.13.16"
     assembly / assemblyJarName := "gpt.jar",
     commonSettings,
     libraryDependencies ++= commonDependencies,
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"), // Added ZIO Test framework
     assembly / assemblyMergeStrategy := {
       case PathList("module-info.class") => MergeStrategy.discard
       case x if x.endsWith("/module-info.class") => MergeStrategy.discard
@@ -40,11 +41,15 @@ ThisBuild / scalaVersion := "2.13.16"
       val zio_http = "dev.zio" %% "zio-http" % Versions.zio_http
       val zio_json = "dev.zio" %% "zio-json" % Versions.zio_json
 
-      val zioDep = List(zio, zio_conf, zio_conf_typesafe, zio_conf_magnolia, zio_http, zio_json)
+      val zio_test = "dev.zio" %% "zio-test" % Versions.zio % Test // Added ZIO Test
+      val zio_test_sbt = "dev.zio" %% "zio-test-sbt" % Versions.zio % Test // Added ZIO Test SBT
+
+      val zioDep = List(zio, zio_conf, zio_conf_typesafe, zio_conf_magnolia, zio_http, zio_json, zio_test, zio_test_sbt) // Added test deps
 
       val pg = "org.postgresql" % "postgresql" % Versions.pgVers
+      val hikaricp = "com.zaxxer" % "HikariCP" % "5.0.1" // Added HikariCP
 
-      val dbDep = List(pg)
+      val dbDep = List(pg, hikaricp) // Added hikaricp to dbDep
     }
 
   val commonDependencies = {
