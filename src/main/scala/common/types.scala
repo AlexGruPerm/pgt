@@ -50,43 +50,36 @@ import common.types.Columns
         listSucCond => Some(listSucCond.map(sc => sc.uncheck()))
       }
 
-    //todo: In all 3 methods don't do update in case of test in testInRepo not affected
     def enableOneTest(testId: TestID): TestModelRepo = {
-      val updatedTests: Option[List[Test]] = optListTestInRepo.map{
-        tr => tr.map {t=>
-          if (t.id == testId) {
-            t.copy(isEnabled = true)
-          } else
-            t
-        }}
-      this.copy(optListTestInRepo = updatedTests)
-    }
-
-    //todo: Need refactoring to eliminate if
-    def updateOneTest(testWithResults: Test): TestModelRepo ={
-      val updatedTests: Option[List[Test]] = optListTestInRepo.map{
-        listTestsInRepo => listTestsInRepo.collect { case testInRepo =>
-          if (testInRepo.id == testWithResults.id)
-            testWithResults
-          else
-            testInRepo
-        }}
+      val updatedTests: Option[List[Test]] = optListTestInRepo.map{_.collect {
+          case testInRepo if testInRepo.id == testId => testInRepo.copy(isEnabled = true)
+          case testInRepo => testInRepo
+        }
+      }
       this.copy(optListTestInRepo = updatedTests)
     }
 
     def disableOneTest(testId: TestID): TestModelRepo = {
-      val updatedTests: Option[List[Test]] = optListTestInRepo.map{
-        tr => tr.map {t=>
-          if (t.id == testId)
-            t.copy(isEnabled = false,
-              success_condition = uncheckConditions(t.success_condition),
-              isExecuted = false,
-              testState = testStateUndefined,
-              testRes = TestExecutionResult()
-            )
-          else
-            t
-        }}
+      val updatedTests: Option[List[Test]] = optListTestInRepo.map{_.collect {
+        case testInRepo if testInRepo.id == testId =>
+          testInRepo.copy(
+            isEnabled = false,
+            success_condition = uncheckConditions(testInRepo.success_condition),
+            isExecuted = false,
+            testState = testStateUndefined,
+            testRes = TestExecutionResult()
+          )
+        case testInRepo => testInRepo
+        }
+      }
+      this.copy(optListTestInRepo = updatedTests)
+    }
+
+    def updateOneTest(testWithResults: Test): TestModelRepo ={
+      val updatedTests: Option[List[Test]] = optListTestInRepo.map{_.collect {
+          case testInRepo if testInRepo.id == testWithResults.id => testWithResults
+          case testInRepo => testInRepo
+      }}
       this.copy(optListTestInRepo = updatedTests)
     }
 

@@ -28,6 +28,10 @@ object WebUiApp {
     } yield resp
   }
 
+  def getRepoInfo: ZIO[ImplTestsRepo, Nothing, Response] =  for {
+    tr <- ZIO.service[ImplTestsRepo]
+    r <- tr.ref.get
+  } yield Response.json(r.keys.toList.toJson)
 
   import data.EncDeccheckTestRepoDataImplicits._
   def checkTestsRepo(sid: SessionId): ZIO[ImplTestsRepo, IOException, Response] =
@@ -166,7 +170,8 @@ object WebUiApp {
       Method.POST / "start_test" -> handler{
         (req: Request) =>
           ZIO.scoped {catchCover(startTests(req))}
-      }
+      },
+      Method.GET / "repo_info" -> handler{getRepoInfo}
     )
 
 }
