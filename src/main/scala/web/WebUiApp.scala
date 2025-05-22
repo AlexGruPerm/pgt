@@ -2,6 +2,7 @@ package web
 
 import common.types.SessionId
 import data.ImplTestsRepo
+import db.jdbcSessionImpl
 import error.ResponseMessage
 import runner.{TestRunner, TestRunnerImpl}
 import tmodel.{RespTest, RespTestModel, Session, TestModel, TestsToRun}
@@ -9,9 +10,7 @@ import zio.http._
 import zio.http.template.Html
 import zio.json.{DecoderOps, EncoderOps}
 import zio.{Scope, ZIO, ZLayer}
-
 import java.io.IOException
-import scala.io._
 
 object WebUiApp {
 
@@ -33,7 +32,6 @@ object WebUiApp {
   import data.EncDeccheckTestRepoDataImplicits._
   def checkTestsRepo(sid: SessionId): ZIO[ImplTestsRepo, IOException, Response] =
     for {
-      //_ <- ZIO.logInfo("checkTestsRepo ")
       tr <- ZIO.service[ImplTestsRepo]
       info <- tr.checkTestRepoData(sid)
       resp <- ZIO.succeed(info match {
@@ -54,7 +52,6 @@ object WebUiApp {
         case Some(testsList) => testsList.find(_.id == testId) match {
           case Some(thisTest) =>
             Response.html(thisTest.getTestAsHtml, Status.Ok)
-            //Response.json(thisTest.toJson)
           case None => Response.json(ResponseMessage(s"Test [$testId] not found in repo.").toJson)
             .status(Status.BadRequest)
         }
@@ -113,8 +110,12 @@ object WebUiApp {
     _ <- ZIO.foreachDiscard(testsToRun.ids.getOrElse(List[Int]())) {
       testId => tr.enableTest(testsToRun.sid, testId)
     }
+    testsSetOpt <- tr.lookup(testsToRun.sid)
     testRunner <- ZIO.service[TestRunner]
-    _ <- testRunner.run()
+    _ <- testsSetOpt match {
+      case Some(testsSet) => testRunner.run().provideSome[Scope](jdbcSessionImpl.layer, ZLayer.succeed(testsSet.meta))
+      case None => ZIO.unit
+    }
   } yield ()
 
 

@@ -22,23 +22,21 @@ trait jdbcSession {
   def getMaxConnections(connection: pgSess): ZIO[Any, SQLException, Int]
 }
 
-case class jdbcSessionImpl(dataSource: HikariDataSource/*cp: TestsMeta*/) extends jdbcSession {
+case class jdbcSessionImpl(dataSource: HikariDataSource) extends jdbcSession {
 
   override def pgConnection(testId: Int): ZIO[Scope, SQLException, pgSess] =
     ZIO.acquireRelease(
         ZIO.attemptBlocking {
-          println("Begin create connection inside pgConnection")
           val conn = dataSource.getConnection()
-          println("-- after dataSource.getConnection() --")
-          println(s"conn.isClosed = ${conn.isClosed}")
           conn.setClientInfo("ApplicationName", s"up_test $testId")
           conn.setAutoCommit(false)
+          val stmt = conn.createStatement()
+          stmt.execute("RESET ALL;")
           val s = pgSess(conn)
-          println(s"sess created inside pgConnection pid = ${s.getPid}")
           s
         }.refineToOrDie[SQLException]
       )(sess => ZIO.succeedBlocking(sess.sess.close())) // Release: close connection to return to pool
-      .tap(sess => sess.getPid.flatMap(pid => ZIO.logInfo(s"Acquired connection for testId $testId. pg_backend_pid = $pid"))
+      .tap(sess => sess.getPid.flatMap(pid => ZIO.logInfo(s"Acquired conn. for testId $testId. pid = $pid"))
         .unlessZIO(ZIO.fiberId.map(_.isNone))
       )
 
@@ -63,7 +61,11 @@ object jdbcSessionImpl {
         config.setPassword(testMeta.db_password)
         config.setMaximumPoolSize(1)
         val hds = new HikariDataSource(config)
-        println(s"HikariCP created, Pool is opened = ${!hds.isClosed} MaximumPoolSize = ${hds.getMaximumPoolSize}")
+        println(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
+        println(" ")
+        println(s"     HikariCP created, pool is opened = ${!hds.isClosed} MaximumPoolSize = ${hds.getMaximumPoolSize}")
+        println(" ")
+        println(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
         hds
       }.refineToOrDie[SQLException]
 
@@ -72,7 +74,14 @@ object jdbcSessionImpl {
       for {
         testMeta <- ZIO.service[TestsMeta]
         session <- ZIO.acquireRelease(createDataSource(testMeta).map(ds => jdbcSessionImpl(ds))) {
-          case jdbcSessionImpl(ds) => ZIO.attempt(ds.close()).orDie
+          case jdbcSessionImpl(ds) => ZIO.attempt{
+            ds.close()
+            println(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
+            println(" ")
+            println(s"     Closing HikariCP, pool is closed = ${ds.isClosed}")
+            println(" ")
+            println(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
+            }.orDie
         }
       } yield session
     }

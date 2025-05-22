@@ -228,7 +228,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
         success_condition.map(lst => lst.map(sc => sc.check(testRes)))
 
       val newTestState: TestState = getState(checked_success_conditions)
-      println(s"checkConditions newTestState=${newTestState}")
+      //println(s"checkConditions newTestState=${newTestState}")
       this.copy(success_condition = checked_success_conditions,testState = newTestState)// testRes = this.testRes)
     }
 
