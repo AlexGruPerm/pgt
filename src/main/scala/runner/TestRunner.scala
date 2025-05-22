@@ -5,15 +5,15 @@ import common.types.SessionId
 import data.ImplTestsRepo
 import db.{jdbcSession, jdbcSessionImpl, pgSess}
 import org.postgresql.jdbc.PgResultSet
-import tmodel.{Test, TestsMeta/*, Affected_rows*/, Cursor, Dataset, Dml_sql, Func_inout_cursor, Integer_value, Select, Select_function}
+import tmodel.{Cursor, Dataset, Dml_sql, Func_inout_cursor, Integer_value, Select, Select_function, Test, TestsMeta}
 import zio.metrics.{Metric, MetricLabel}
-import zio.{UIO, ZIO, ZLayer}
+import zio.{Scope, UIO, ZIO, ZLayer}
 import common.types._
 
 import java.sql.{Connection, ResultSet}
 
   trait TestRunner {
-    def run(): ZIO[Any, Exception, Unit]
+    def run(): ZIO[Scope/*Any*/, Exception, Unit]
   }
 
   case class TestRunnerImpl(tr: ImplTestsRepo, sid: SessionId) extends TestRunner {
@@ -201,9 +201,10 @@ import java.sql.{Connection, ResultSet}
             }.as(TestExecutionResult(e.getClass.getName, e.getMessage))
         }.orDie
 
-  private def exec(testInRepo: Test): ZIO[TestsMeta with jdbcSession, Exception, Unit] = for {
+  private def exec(testInRepo: Test): ZIO[Scope with TestsMeta with jdbcSession, Exception, Unit] = for {
     jdbc <- ZIO.service[jdbcSession]
-    conn <- jdbc.pgConnection(testInRepo.id)
+    _ <- ZIO.logInfo("*** debug ***")
+    conn <- jdbc.pgConnection(testInRepo.id)//.provide(ZLayer.succeed())
     _ <- ZIO.logInfo(s" ----> sid=[$sid] tests [${testInRepo.id}] isOpened Connection = ${!conn.sess.isClosed}")
     _ <- (testInRepo.call_type,testInRepo.ret_type) match {
       case (_: Select_function.type, _: Cursor.type) => exec_select_function_cursor(conn,testInRepo)
@@ -215,15 +216,15 @@ import java.sql.{Connection, ResultSet}
     }
   } yield ()
 
-  def run(): ZIO[Any, Exception, Unit] = for {
+  def run(): ZIO[Scope, Exception, Unit] = for {
       testsSetOpt <- tr.lookup(sid)
       _ <- testsSetOpt match {
         case Some(testsSet) =>
           ZIO.logInfo(s" Begin tests set execution for SID = $sid") *>
-          ZIO.foreachDiscard(testsSet.optListTestInRepo.getOrElse(List[Test]()).filter(_.isEnabled == true)) {
-            testId: Test =>
-              exec(testId).provide(ZLayer.succeed(testsSet.meta), jdbcSessionImpl.layer)
-          }
+              ZIO.foreachDiscard(testsSet.optListTestInRepo.getOrElse(List[Test]()).filter(_.isEnabled == true)) {
+                testId: Test =>
+                  exec(testId).provideSome[Scope](ZLayer.succeed(testsSet.meta), jdbcSessionImpl.layer)
+              }
         case None => ZIO.unit
       }
     } yield ()

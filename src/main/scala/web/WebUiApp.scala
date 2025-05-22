@@ -104,7 +104,7 @@ object WebUiApp {
       }
     } yield resp
 
-  private def startTestsLogic(testsToRun: TestsToRun): ZIO[ImplTestsRepo with TestRunner, Exception, Unit] = for {
+  private def startTestsLogic(testsToRun: TestsToRun): ZIO[Scope with ImplTestsRepo with TestRunner, Exception, Unit] = for {
     tr <- ZIO.service[ImplTestsRepo]
     _ <- ZIO.logInfo(s" testsToRun = ${testsToRun.sid} - ${testsToRun.ids}")
     _ <- ZIO.logInfo(s" Call disableAllTest for sid = ${testsToRun.sid}")
@@ -124,7 +124,7 @@ object WebUiApp {
   /**
    * Start selected tests (array of id) from Tests set identified by sid.
   */
-  def startTests(req: Request): ZIO[ImplTestsRepo, Exception, Response] =
+  def startTests(req: Request): ZIO[Scope with ImplTestsRepo, Exception, Response] =
     for {
       tr <- ZIO.service[ImplTestsRepo]
       u <- req.body.asString.map(_.fromJson[TestsToRun])
@@ -134,7 +134,7 @@ object WebUiApp {
       resp <- u match {
         case Left(exp_str) => ZioResponseMsgBadRequest(exp_str)
         case Right(testsToRun) =>
-          startTestsLogic(testsToRun).provide(ZLayer.succeed(tr),TestRunnerImpl.layer, ZLayer.succeed(testsToRun.sid))
+          startTestsLogic(testsToRun).provideSome[Scope](ZLayer.succeed(tr),TestRunnerImpl.layer, ZLayer.succeed(testsToRun.sid))
           .foldZIO(
             err => ZIO.logError("-- this point --") *> ZioResponseMsgBadRequest(err.getMessage),
             _ => ZIO.succeed(Response.json(ResponseMessage("OK").toJson))
@@ -162,7 +162,10 @@ object WebUiApp {
         (sid: String, testId: Int, _: Request) => catchCover(getTestInfo(sid, testId))
       },
       Method.POST / "load_test"  -> handler{(req: Request) => catchCover(loadTests(req))},
-      Method.POST / "start_test" -> handler{(req: Request) => catchCover(startTests(req))}
+      Method.POST / "start_test" -> handler{
+        (req: Request) =>
+          ZIO.scoped {catchCover(startTests(req))}
+      }
     )
 
 }

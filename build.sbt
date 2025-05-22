@@ -10,6 +10,7 @@ ThisBuild / scalaVersion := "2.13.16"
     val zio_http    = "3.2.0"
     val zio_json    = "0.7.43"
     val pgVers      = "42.7.5"
+    val hikari      = "5.1.0"
   }
 
   lazy val global = project
@@ -43,8 +44,8 @@ ThisBuild / scalaVersion := "2.13.16"
       val zioDep = List(zio, zio_conf, zio_conf_typesafe, zio_conf_magnolia, zio_http, zio_json)
 
       val pg = "org.postgresql" % "postgresql" % Versions.pgVers
-
-      val dbDep = List(pg)
+      val hikaricp = "com.zaxxer" % "HikariCP" % Versions.hikari
+      val dbDep = List(pg,hikaricp)
     }
 
   val commonDependencies = {
