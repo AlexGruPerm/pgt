@@ -98,6 +98,24 @@
                    return response;
         }
 
+        async function removeCurrentSid() {
+             console.log('-- request remove sid ---------------------------------------------- SID = ',globalSessionId);
+             const response = await fetch(`remove_sid/`+globalSessionId, {method: "GET"});
+               responseStatus = response.status;
+                   if (responseStatus == 400) {
+                     console.log('-- error ----------------------------------------------');
+                     console.log('Response status = ',responseStatus);
+                     responseText = await response.text();
+                     console.log('Response text = ',responseText);
+                     console.log('---------------------------------------------------------');
+                   } else {
+                     responseText = await response.text();
+                     const response_json = JSON.parse(responseText);
+                     console.log('-- sid removed ----------------------------------------------');
+                     console.log(response_json);
+                   }
+                   return response;
+        }
 
         function getTestsAgrInfo() {
           if (isTestsExecuting == 1) {
@@ -185,6 +203,7 @@
         }
 
         async function btnUploadTestFile() {
+             const resultJsonRemoveSid = await removeCurrentSid();
              const resultJson = await loadJsonTests();
              console.log('-- response ---------------------------------------------');
              console.log(resultJson);

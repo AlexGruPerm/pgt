@@ -64,6 +64,13 @@ object WebUiApp {
       })
     } yield resp
 
+  def removeSidFromRepo(sid: SessionId): ZIO[ImplTestsRepo, IOException, Response] =
+    for {
+      _ <- ZIO.logInfo(s"removeSidFromRepo for sid = $sid ")
+      testRepo <- ZIO.service[ImplTestsRepo]
+      _ <- testRepo.remove(sid)
+      resp = Response.json(ResponseMessage(s"All tests and sid removed from repo, sid = $sid").toJson)
+    } yield resp
 
   import tmodel.EncDecRespTestModelImplicits._
   def loadTests(req: Request): ZIO[ImplTestsRepo, Exception, Response] =
@@ -171,7 +178,10 @@ object WebUiApp {
         (req: Request) =>
           ZIO.scoped {catchCover(startTests(req))}
       },
-      Method.GET / "repo_info" -> handler{getRepoInfo}
+      Method.GET / "repo_info" -> handler{getRepoInfo},
+      Method.GET / "remove_sid" / string("sid") -> handler{
+        (sid: String, _: Request) => catchCover(removeSidFromRepo(sid))
+      }
     )
 
 }

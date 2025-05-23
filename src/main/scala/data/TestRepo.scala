@@ -21,6 +21,8 @@ import zio.{UIO, _}
 
     def lookup(sid: SessionId): UIO[Option[TestModelRepo]]
 
+    def remove(sid: SessionId): UIO[Unit]
+
     def elementsCnt :UIO[Int]
 
     /**
@@ -67,6 +69,10 @@ import zio.{UIO, _}
 
     def lookup(sid: SessionId): UIO[Option[TestModelRepo]] =
       ref.get.map(_.get(sid))
+
+    def remove(sid: SessionId): UIO[Unit] = for {
+      repo <- ref.get
+    } yield repo.remove(sid)
 
     def elementsCnt: UIO[Int] = ref.get.map(_.size)
 
