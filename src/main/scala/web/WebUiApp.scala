@@ -178,7 +178,6 @@ object WebUiApp {
         (req: Request) =>
           ZIO.scoped {catchCover(startTests(req))}
       },
-      //comment just for check git
       Method.GET / "repo_info" -> handler{getRepoInfo},
       Method.GET / "remove_sid" / string("sid") -> handler{
         (sid: String, _: Request) => catchCover(removeSidFromRepo(sid))
