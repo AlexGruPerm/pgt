@@ -2,302 +2,6 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>UP-Tests SPA Main page</title>
-    <script>
-        var globalSessionId;
-        var responseStatus;
-        var responseText;
-        var checkedTestId;
-        var checkedCommon;
-        var checkedTestIdJson;
-        var isTestsExecuting = 0;
-        var intervalTestsAgrState;
-
-        function myStopFunction() {
-          console.log("STOP checking..............");
-          clearInterval(intervalTestsAgrState);
-        }
-
-        function checkSuccessTest(testId){
-          const divTests = document.querySelector(`div[id="test_list"]`);
-          const checkBox = divTests.querySelectorAll(`span[id="test_${testId}"]`)[0];
-          checkBox.classList.value = "";
-          checkBox.className = 'test_state_success';
-        }
-
-        function setSpansUndefined(){
-          const divTests = document.querySelector(`div[id="test_list"]`);
-          const checkBox = divTests.querySelectorAll(`span[id^=test]`);
-          Array.from(checkBox).map(elm => elm.classList.value = "");
-          Array.from(checkBox).map(elm => elm.className = "test_state_undef");
-        }
-
-        function checkFailTest(testId){
-          const divTests = document.querySelector(`div[id="test_list"]`);
-          const checkBox = divTests.querySelectorAll(`span[id="test_${testId}"]`)[0];
-          checkBox.classList.value = "";
-          checkBox.className = 'test_state_failure';
-        }
-
-        async function getTestsState() {
-             console.log('-- request tests state ---------------------------------------------- SID = ',globalSessionId);
-             const curr_state = document.getElementById("test_current_state");
-               const response = await fetch(`check/`+globalSessionId, {method: "GET"});
-               responseStatus = response.status;
-                   if (responseStatus == 400) {
-                     console.log('-- error ----------------------------------------------');
-                     console.log('Response status = ',responseStatus);
-                     responseText = await response.text();
-                     curr_state.className = 'error_msg';
-                     curr_state.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
-                     console.log('Response text = ',responseText);
-                     console.log('---------------------------------------------------------');
-                   } else {
-                     curr_state.classList.remove('error_msg');
-                     curr_state.innerHTML = "";
-                     responseText = await response.text();
-
-                     const response_json = JSON.parse(responseText);
-                     const t_total    = response_json.tests.total;
-                     const t_enabled  = response_json.tests.enabled;
-                     const t_disabled = response_json.tests.disabled;
-                     const t_executed = response_json.tests.executed;
-                     const t_success  = response_json.tests.success;
-                     const t_failure  = response_json.tests.failure;
-                     const t_percent  = Math.round((t_executed*100)/t_enabled);
-
-
-                     curr_state.innerHTML  = `<div>total : ${t_total} </div>`;
-                     curr_state.innerHTML += `<div>enabled : ${t_enabled} </div>`;
-                     curr_state.innerHTML += `<div>disabled : ${t_disabled} </div>`;
-                     curr_state.innerHTML += `<div>executed : ${t_executed} </div>`;
-                     curr_state.innerHTML += `<div>success : ${t_success} </div>`;
-                     curr_state.innerHTML += `<div>failure : ${t_failure} </div>`;
-                     curr_state.innerHTML += `<div>percent : ${t_percent} </div>`;
-
-                       console.log("success array - ",response_json.tests.successList);
-                       response_json.tests.successList.map(
-                         succElem => checkSuccessTest(succElem)//console.log(succElem)
-                       );
-                       response_json.tests.failureList.map(
-                         succElem => checkFailTest(succElem)//console.log(succElem)
-                       );
-
-                     curr_state.classList.remove('test_state_undef');
-                       if (t_executed < t_enabled) {
-                         curr_state.className = 'test_state_executing';
-                         console.log('set class - test_state_executing ');
-                       } else if (t_enabled == t_success) {
-                         console.log('set class - test_state_success ');
-                         curr_state.className = 'test_state_success';
-                       } else {
-                         curr_state.className = 'test_state_failure';
-                         console.log('set class - test_state_failure ');
-                       }
-
-                   }
-                   return response;
-        }
-
-        async function removeCurrentSid() {
-             console.log('-- request remove sid ---------------------------------------------- SID = ',globalSessionId);
-             const response = await fetch(`remove_sid/`+globalSessionId, {method: "GET"});
-               responseStatus = response.status;
-                   if (responseStatus == 400) {
-                     console.log('-- error ----------------------------------------------');
-                     console.log('Response status = ',responseStatus);
-                     responseText = await response.text();
-                     console.log('Response text = ',responseText);
-                     console.log('---------------------------------------------------------');
-                   } else {
-                     responseText = await response.text();
-                     const response_json = JSON.parse(responseText);
-                     console.log('-- sid removed ----------------------------------------------');
-                     console.log(response_json);
-                   }
-                   return response;
-        }
-
-        function getTestsAgrInfo() {
-          if (isTestsExecuting == 1) {
-          getTestsState();
-          }
-        }
-
-        async function getTestInfo(testId) {
-             console.log('-- request test info ---------------------------------------------- ID= ',testId);
-             const pre_json = document.getElementById("json_test_info");
-             const resp_message = document.getElementById("resp_message");
-               const response = await fetch(`test_info/`+globalSessionId+`/`+testId, {method: "GET"});
-               responseStatus = response.status;
-                   if (responseStatus == 400) {
-                     console.log('-- error ----------------------------------------------');
-                     console.log('Response status = ',responseStatus);
-                     responseText = await response.text();
-                     resp_message.className = 'error_msg';
-                     resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
-                     console.log('Response text = ',responseText);
-                     console.log('---------------------------------------------------------');
-                   } else {
-                     resp_message.classList.remove('error_msg');
-                     resp_message.innerHTML = "";
-                     responseText = await response.text();
-                     //pre_json.textContent = JSON.stringify(JSON.parse(responseText), undefined, 2);
-                     pre_json.innerHTML = responseText;
-                   }
-                   return response;
-        }
-
-        async function test_info(test){
-          const testId = test.id.replace("test_","");
-          console.log('Info for test = ',testId);
-          const resultJson = await getTestInfo(testId);
-        }
-
-        function parse_response_populate_tests(tests_json){
-          globalSessionId = tests_json.session.id;
-          console.log("SessionId : ",globalSessionId);
-          const tests_container = document.getElementById("test_list");
-          tests_container.innerHTML = "";
-            for (test of tests_json.tests) {
-                tests_container.innerHTML += `<input type="checkbox" id="test_${test.id}" name="test_${test.id}" ><span id="test_${test.id}" onclick="test_info(this)" class="test_undefined">${test.name}</span><br/>`;
-            }
-        }
-
-        function loadFile(file){
-            return new Promise(resolve=>{
-                let reader = new FileReader()
-                reader.onload = function(event) {
-                    let data = event.target.result
-                    resolve(data)
-                }
-                reader.readAsText(file)
-            })
-        }
-
-        async function loadJsonTests() {
-             console.log('Begin loading new JSON file with tests into server.');
-             var file = fileupload.files[0];
-             var fileContent = await loadFile(file);
-             console.log('-- request ----------------------------------------------');
-             console.log(fileContent);
-             console.log('---------------------------------------------------------');
-               const response = await fetch(`load_test`, {
-                    method: "POST",
-                    headers: {
-                     'Accept': 'application/json',
-                     'Content-Type': 'application/json'
-                    },
-                    body: fileContent
-                  });
-               responseStatus = response.status;
-                   if (responseStatus == 400) {
-                     console.log('-- error ----------------------------------------------');
-                     console.log('Response status = ',responseStatus);
-                     responseText = await response.text();
-                     console.log('Response text = ',responseText);
-                     console.log('---------------------------------------------------------');
-                     return response;
-                   } else {
-                     return response.json();
-                   }
-        }
-
-        async function btnUploadTestFile() {
-             const resultJsonRemoveSid = await removeCurrentSid();
-             const resultJson = await loadJsonTests();
-             console.log('-- response ---------------------------------------------');
-             console.log(resultJson);
-             console.log('---------------------------------------------------------');
-             const resp_message = document.getElementById("resp_message");
-             const tests_container = document.getElementById("test_list");
-               if (responseStatus == 400) {
-                 tests_container.innerHTML = "";
-                 resp_message.className = 'error_msg';
-                 resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
-               } else {
-                 resp_message.classList.remove('error_msg');
-                 resp_message.innerHTML = "";
-                 parse_response_populate_tests(resultJson);
-               }
-        }
-
-        async function startJsonTests() {
-             console.log('Send id of test to execting.');
-             console.log('-- request ----------------------------------------------');
-             console.log(checkedTestIdJson);
-             console.log('---------------------------------------------------------');
-             setSpansUndefined();
-
-               const response = await fetch(`start_test`, {
-                    method: "POST",
-                    headers: {
-                     'Accept': 'application/json',
-                     'Content-Type': 'application/json'
-                    },
-                    body: checkedTestIdJson
-                  });
-               const resp_message = document.getElementById("resp_message");
-               const tests_container = document.getElementById("test_list");
-               responseStatus = response.status;
-                   if (responseStatus == 400) {
-                     console.log('-- error ----------------------------------------------');
-                     myStopFunction();
-                     console.log('Response status = ',responseStatus);
-                     responseText = await response.text();
-                     console.log('Response text = ',responseText);
-                     resp_message.className = 'error_msg';
-                     resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
-                     console.log('---------------------------------------------------------');
-                     return response;
-                   } else {
-                     myStopFunction();
-                     getTestsState();
-                     resp_message.classList.remove('error_msg');
-                     resp_message.innerHTML = "";
-                     return response.json();
-                   }
-        }
-
-        async function btnStartTests(){
-          console.log('-- start tests -------------------- isTestsExecuting=',isTestsExecuting);
-          const pre_json = document.getElementById("json_test_info");
-          pre_json.innerHTML = "";
-          const curr_state = document.getElementById("test_current_state");
-          curr_state.innerHTML = "";
-          const tests_container = document.getElementById("test_list");
-          checkedTestId = Array.from(tests_container.querySelectorAll("input[type=checkbox]:checked"))
-            .map((elem) => parseInt(elem.id.replace("test_","")));
-          checkedCommon = "{\"sid\" : \"" + globalSessionId + "\" , \"ids\" : "+JSON.stringify(checkedTestId)+"}";
-          console.log("checkedCommon = ",checkedCommon);
-          checkedTestIdJson = JSON.parse(JSON.stringify(checkedCommon));
-          console.log("checkedTestIdJson = ",checkedTestIdJson);
-             if (checkedTestId.length) {
-               console.log("START checking..............");
-               isTestsExecuting = 1;
-               intervalTestsAgrState = setInterval(getTestsAgrInfo, 200);
-             }
-             const resultJson = await startJsonTests();
-             console.log('-- response -------------------------------- isTestsExecuting =',isTestsExecuting);
-             console.log(resultJson);
-             isTestsExecuting = 0;
-             console.log('------------------------------------------- isTestsExecuting =',isTestsExecuting);
-        }
-
-        function btnSelectAll(){
-           console.log('select all tests');
-           const tests_container = document.getElementById("test_list");
-           Array.from(tests_container.querySelectorAll("input[type=checkbox]"))
-             .map((elem) => elem.checked = true)
-        }
-
-        function btnUnselectAll(){
-          console.log('unselect all tests');
-          const tests_container = document.getElementById("test_list");
-          Array.from(tests_container.querySelectorAll("input[type=checkbox]"))
-             .map((elem) => elem.checked = false)
-        }
-
-    </script>
     <style type="text/css">
 <!--
 body {
@@ -383,7 +87,30 @@ span:hover {
 <table width="100%" border="2">
     <tr>
         <td width="60%" height="200px">
-            <input id="fileupload" type="file" accept=".json" name="fileupload" />
+            <!-- Переключатель режима -->
+            <fieldset>
+                <legend>Тип файла</legend>
+                <label>
+                    <input type="radio" name="fileMode" value="json">
+                    JSON
+                </label>
+                <label style="margin-left:16px;">
+                    <input type="radio" name="fileMode" value="excel" checked>
+                    Excel
+                </label>
+            </fieldset>
+
+            <!-- Ваши инпуты и кнопки -->
+            <input id="fileuploadJson" type="file" accept=".json" name="fileupload_json" hidden>
+            <button id="btnPickJson" type="button" onclick="document.getElementById('fileuploadJson').click()">Выбрать JSON файл</button>
+
+            <input id="fileuploadExcel" type="file" accept=".xlsx" name="fileupload_excel" hidden>
+            <button id="btnPickExcel" type="button" onclick="document.getElementById('fileuploadExcel').click()">Выбрать Excel файл</button>
+
+            <!--
+            <input id="fileuploadJson" type="file" accept=".json" name="fileupload_json" />
+            <input id="fileuploadExcel" type="file" accept=".xlsx" name="fileupload_excel" />
+            -->
             <br><br>
             <div id="btn_upload_test_file" onclick="btnUploadTestFile()"  class="label">send json file</div>
                 <div class="sel-button-container">
@@ -406,5 +133,406 @@ span:hover {
         </td>
     </tr>
 </table>
+<script>
+    const $modeRadios   = document.querySelectorAll('input[name="fileMode"]');
+    const $jsonInput    = document.getElementById('fileuploadJson');
+    const $excelInput   = document.getElementById('fileuploadExcel');
+    const $btnPickJson  = document.getElementById('btnPickJson');
+    const $btnPickExcel = document.getElementById('btnPickExcel');
+
+    // Проверка наличия узлов
+    if (!$jsonInput || !$excelInput || !$btnPickJson || !$btnPickExcel || $modeRadios.length === 0) {
+      console.error('Init error: missing elements', {
+        jsonInput: !!$jsonInput, excelInput: !!$excelInput,
+        btnPickJson: !!$btnPickJson, btnPickExcel: !!$btnPickExcel,
+        radios: $modeRadios.length
+      });
+      //return;
+    }
+
+    function setMode(mode) {
+      const isJson = mode === 'json';
+      // Эти элементы точно не null благодаря проверке выше
+      $btnPickJson.disabled  = !isJson;
+      $btnPickExcel.disabled = isJson;
+      if (isJson) {
+        $excelInput.value = '';
+      } else {
+        $jsonInput.value = '';
+      }
+    }
+
+    // Начальное состояние
+    const initialMode = [...$modeRadios].find(r => r.checked)?.value || 'json';
+    setMode(initialMode);
+
+    // Подписка на радиокнопки
+    $modeRadios.forEach(r => r.addEventListener('change', e => setMode(e.target.value)));
+
+  //---------------------------------------------------
+
+  var globalSessionId;
+  var responseStatus;
+  var responseText;
+  var checkedTestId;
+  var checkedCommon;
+  var checkedTestIdJson;
+  var isTestsExecuting = 0;
+  var intervalTestsAgrState;
+
+  function myStopFunction() {
+    console.log("STOP checking..............");
+    clearInterval(intervalTestsAgrState);
+  }
+
+  function checkSuccessTest(testId){
+    const divTests = document.querySelector(`div[id="test_list"]`);
+    const checkBox = divTests.querySelectorAll(`span[id="test_${testId}"]`)[0];
+    checkBox.classList.value = "";
+    checkBox.className = 'test_state_success';
+  }
+
+  function setSpansUndefined(){
+    const divTests = document.querySelector(`div[id="test_list"]`);
+    const checkBox = divTests.querySelectorAll(`span[id^=test]`);
+    Array.from(checkBox).map(elm => elm.classList.value = "");
+    Array.from(checkBox).map(elm => elm.className = "test_state_undef");
+  }
+
+  function checkFailTest(testId){
+    const divTests = document.querySelector(`div[id="test_list"]`);
+    const checkBox = divTests.querySelectorAll(`span[id="test_${testId}"]`)[0];
+    checkBox.classList.value = "";
+    checkBox.className = 'test_state_failure';
+  }
+
+  async function getTestsState() {
+       console.log('-- request tests state ---------------------------------------------- SID = ',globalSessionId);
+       const curr_state = document.getElementById("test_current_state");
+         const response = await fetch(`check/`+globalSessionId, {method: "GET"});
+         responseStatus = response.status;
+             if (responseStatus == 400) {
+               console.log('-- error ----------------------------------------------');
+               console.log('Response status = ',responseStatus);
+               responseText = await response.text();
+               curr_state.className = 'error_msg';
+               curr_state.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+               console.log('Response text = ',responseText);
+               console.log('---------------------------------------------------------');
+             } else {
+               curr_state.classList.remove('error_msg');
+               curr_state.innerHTML = "";
+               responseText = await response.text();
+
+               const response_json = JSON.parse(responseText);
+               const t_total    = response_json.tests.total;
+               const t_enabled  = response_json.tests.enabled;
+               const t_disabled = response_json.tests.disabled;
+               const t_executed = response_json.tests.executed;
+               const t_success  = response_json.tests.success;
+               const t_failure  = response_json.tests.failure;
+               const t_percent  = Math.round((t_executed*100)/t_enabled);
+
+
+               curr_state.innerHTML  = `<div>total : ${t_total} </div>`;
+               curr_state.innerHTML += `<div>enabled : ${t_enabled} </div>`;
+               curr_state.innerHTML += `<div>disabled : ${t_disabled} </div>`;
+               curr_state.innerHTML += `<div>executed : ${t_executed} </div>`;
+               curr_state.innerHTML += `<div>success : ${t_success} </div>`;
+               curr_state.innerHTML += `<div>failure : ${t_failure} </div>`;
+               curr_state.innerHTML += `<div>percent : ${t_percent} </div>`;
+
+                 console.log("success array - ",response_json.tests.successList);
+                 response_json.tests.successList.map(
+                   succElem => checkSuccessTest(succElem)//console.log(succElem)
+                 );
+                 response_json.tests.failureList.map(
+                   succElem => checkFailTest(succElem)//console.log(succElem)
+                 );
+
+               curr_state.classList.remove('test_state_undef');
+                 if (t_executed < t_enabled) {
+                   curr_state.className = 'test_state_executing';
+                   console.log('set class - test_state_executing ');
+                 } else if (t_enabled == t_success) {
+                   console.log('set class - test_state_success ');
+                   curr_state.className = 'test_state_success';
+                 } else {
+                   curr_state.className = 'test_state_failure';
+                   console.log('set class - test_state_failure ');
+                 }
+
+             }
+             return response;
+  }
+
+  async function removeCurrentSid() {
+       console.log('-- request remove sid ---------------------------------------------- SID = ',globalSessionId);
+       const response = await fetch(`remove_sid/`+globalSessionId, {method: "GET"});
+         responseStatus = response.status;
+             if (responseStatus == 400) {
+               console.log('-- error ----------------------------------------------');
+               console.log('Response status = ',responseStatus);
+               responseText = await response.text();
+               console.log('Response text = ',responseText);
+               console.log('---------------------------------------------------------');
+             } else {
+               responseText = await response.text();
+               const response_json = JSON.parse(responseText);
+               console.log('-- sid removed ----------------------------------------------');
+               console.log(response_json);
+             }
+             return response;
+  }
+
+  function getTestsAgrInfo() {
+    if (isTestsExecuting == 1) {
+    getTestsState();
+    }
+  }
+
+  async function getTestInfo(testId) {
+       console.log('-- request test info ---------------------------------------------- ID= ',testId);
+       const pre_json = document.getElementById("json_test_info");
+       const resp_message = document.getElementById("resp_message");
+         const response = await fetch(`test_info/`+globalSessionId+`/`+testId, {method: "GET"});
+         responseStatus = response.status;
+             if (responseStatus == 400) {
+               console.log('-- error ----------------------------------------------');
+               console.log('Response status = ',responseStatus);
+               responseText = await response.text();
+               resp_message.className = 'error_msg';
+               resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+               console.log('Response text = ',responseText);
+               console.log('---------------------------------------------------------');
+             } else {
+               resp_message.classList.remove('error_msg');
+               resp_message.innerHTML = "";
+               responseText = await response.text();
+               //pre_json.textContent = JSON.stringify(JSON.parse(responseText), undefined, 2);
+               pre_json.innerHTML = responseText;
+             }
+             return response;
+  }
+
+  async function test_info(test){
+    const testId = test.id.replace("test_","");
+    console.log('Info for test = ',testId);
+    const resultJson = await getTestInfo(testId);
+  }
+
+  function parse_response_populate_tests(tests_json){
+    globalSessionId = tests_json.session.id;
+    console.log("SessionId : ",globalSessionId);
+    const tests_container = document.getElementById("test_list");
+    tests_container.innerHTML = "";
+      for (test of tests_json.tests) {
+          tests_container.innerHTML += `<input type="checkbox" id="test_${test.id}" name="test_${test.id}" ><span id="test_${test.id}" onclick="test_info(this)" class="test_undefined">${test.name}</span><br/>`;
+      }
+  }
+
+  function loadFile(file){
+      return new Promise(resolve=>{
+          let reader = new FileReader()
+          reader.onload = function(event) {
+              let data = event.target.result
+              resolve(data)
+          }
+          reader.readAsText(file)
+      })
+  }
+
+  async function loadJsonTests() {
+       console.log('Begin loading new JSON file with tests into server.');
+       var file = fileupload.files[0];
+       var fileContent = await loadFile(file);
+       console.log('-- request ----------------------------------------------');
+       console.log(fileContent);
+       console.log('---------------------------------------------------------');
+         const response = await fetch(`load_test`, {
+              method: "POST",
+              headers: {
+               'Accept': 'application/json',
+               'Content-Type': 'application/json'
+              },
+              body: fileContent
+            });
+         responseStatus = response.status;
+             if (responseStatus == 400) {
+               console.log('-- error ----------------------------------------------');
+               console.log('Response status = ',responseStatus);
+               responseText = await response.text();
+               console.log('Response text = ',responseText);
+               console.log('---------------------------------------------------------');
+               return response;
+             } else {
+               return response.json();
+             }
+  }
+
+  // Отправка
+  async function btnUploadTestFile() {
+    console.log('btnUploadTestFile');
+    const mode = [...$modeRadios].find(r => r.checked)?.value;
+
+    if (mode === 'json') {
+      console.log('btnUploadTestFile - JSON');
+      const file = $jsonInput.files?.[0];
+      if (!file) { alert('Выберите .json файл'); return; }
+      if (!file.name.toLowerCase().endsWith('.json')) { alert('Ожидается .json'); return; }
+      await uploadJson(file);
+    } else if (mode === 'excel') {
+      console.log('btnUploadTestFile - Excel');
+      const file = $excelInput.files?.[0];
+      if (!file) { alert('Выберите .xlsx файл'); return; }
+      if (!file.name.toLowerCase().endsWith('.xlsx')) { alert('Ожидается .xlsx'); return; }
+      await uploadExcel(file);
+    } else {
+      alert('Выберите тип файла (JSON или Excel)');
+    }
+  }
+
+  // Отправка JSON как application/json
+  async function uploadJson(file) {
+    const text = await file.text();
+    const response = await fetch('load_test', {
+      method: 'POST',
+      headers: { 'Accept':'application/json', 'Content-Type':'application/json' },
+      body: text
+    });
+    await handleResponse(response);
+  }
+
+  // Отправка Excel как multipart/form-data
+  async function uploadExcel(file) {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const response = await fetch('load_test_excel', {
+      method: 'POST',
+      body: form // Content-Type выставит сам браузер (boundary)
+    });
+    await handleResponse(response);
+  }
+
+  // Унифицированная обработка ответа
+  async function handleResponse(response) {
+    const ct = response.headers.get('content-type') || '';
+    const resp_message = document.getElementById("resp_message");
+    const tests_container = document.getElementById("test_list");
+    if (!response.ok) {
+      const payload = ct.includes('application/json') ? await response.json() : await response.text();
+      console.error('Error', response.status, payload);
+      alert('Ошибка: ' + response.status);
+           tests_container.innerHTML = "";
+           resp_message.className = 'error_msg';
+           resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+      return;
+    } else {
+      const payload = ct.includes('application/json') ? await response.json() : await response.text();
+      console.log('OK', payload);
+           resp_message.classList.remove('error_msg');
+           resp_message.innerHTML = "";
+           parse_response_populate_tests(payload/*resultJson*/);
+    }
+  }
+
+  /*
+  async function btnUploadTestFile() {
+       const resultJsonRemoveSid = await removeCurrentSid();
+       const resultJson = await loadJsonTests();
+       console.log('-- response ---------------------------------------------');
+       console.log(resultJson);
+       console.log('---------------------------------------------------------');
+       const resp_message = document.getElementById("resp_message");
+       const tests_container = document.getElementById("test_list");
+         if (responseStatus == 400) {
+           tests_container.innerHTML = "";
+           resp_message.className = 'error_msg';
+           resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+         } else {
+           resp_message.classList.remove('error_msg');
+           resp_message.innerHTML = "";
+           parse_response_populate_tests(resultJson);
+         }
+  }
+  */
+
+  async function startJsonTests() {
+       console.log('Send id of test to execting.');
+       console.log('-- request ----------------------------------------------');
+       console.log(checkedTestIdJson);
+       console.log('---------------------------------------------------------');
+       setSpansUndefined();
+
+         const response = await fetch(`start_test`, {
+              method: "POST",
+              headers: {
+               'Accept': 'application/json',
+               'Content-Type': 'application/json'
+              },
+              body: checkedTestIdJson
+            });
+         const resp_message = document.getElementById("resp_message");
+         const tests_container = document.getElementById("test_list");
+         responseStatus = response.status;
+             if (responseStatus == 400) {
+               console.log('-- error ----------------------------------------------');
+               myStopFunction();
+               console.log('Response status = ',responseStatus);
+               responseText = await response.text();
+               console.log('Response text = ',responseText);
+               resp_message.className = 'error_msg';
+               resp_message.innerHTML = `ERROR:<br/> ${JSON.parse(responseText).message}`;
+               console.log('---------------------------------------------------------');
+               return response;
+             } else {
+               myStopFunction();
+               getTestsState();
+               resp_message.classList.remove('error_msg');
+               resp_message.innerHTML = "";
+               return response.json();
+             }
+  }
+
+  async function btnStartTests(){
+    console.log('-- start tests -------------------- isTestsExecuting=',isTestsExecuting);
+    const pre_json = document.getElementById("json_test_info");
+    pre_json.innerHTML = "";
+    const curr_state = document.getElementById("test_current_state");
+    curr_state.innerHTML = "";
+    const tests_container = document.getElementById("test_list");
+    checkedTestId = Array.from(tests_container.querySelectorAll("input[type=checkbox]:checked"))
+      .map((elem) => parseInt(elem.id.replace("test_","")));
+    checkedCommon = "{\"sid\" : \"" + globalSessionId + "\" , \"ids\" : "+JSON.stringify(checkedTestId)+"}";
+    console.log("checkedCommon = ",checkedCommon);
+    checkedTestIdJson = JSON.parse(JSON.stringify(checkedCommon));
+    console.log("checkedTestIdJson = ",checkedTestIdJson);
+       if (checkedTestId.length) {
+         console.log("START checking..............");
+         isTestsExecuting = 1;
+         intervalTestsAgrState = setInterval(getTestsAgrInfo, 200);
+       }
+       const resultJson = await startJsonTests();
+       console.log('-- response -------------------------------- isTestsExecuting =',isTestsExecuting);
+       console.log(resultJson);
+       isTestsExecuting = 0;
+       console.log('------------------------------------------- isTestsExecuting =',isTestsExecuting);
+  }
+
+  function btnSelectAll(){
+     console.log('select all tests');
+     const tests_container = document.getElementById("test_list");
+     Array.from(tests_container.querySelectorAll("input[type=checkbox]"))
+       .map((elem) => elem.checked = true)
+  }
+
+  function btnUnselectAll(){
+    console.log('unselect all tests');
+    const tests_container = document.getElementById("test_list");
+    Array.from(tests_container.querySelectorAll("input[type=checkbox]"))
+       .map((elem) => elem.checked = false)
+  }
+
+</script>
 </body>
 </html>

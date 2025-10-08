@@ -10,7 +10,9 @@ import zio.http._
 import zio.http.template.Html
 import zio.json.{DecoderOps, EncoderOps}
 import zio.{Scope, ZIO, ZLayer}
+
 import java.io.IOException
+import java.nio.file.{Files, StandardOpenOption}
 
 object WebUiApp {
 
@@ -76,15 +78,9 @@ object WebUiApp {
   def loadTests(req: Request): ZIO[ImplTestsRepo, Exception, Response] =
     for {
       tr <- ZIO.service[ImplTestsRepo]
-
       bodyAsStr <- req.body.asString.catchAll{
         case e: Exception => ZIO.logError(s"pgt-0 error parsing input file with tests : ${e.getMessage}").as("{}")
       }
-      //todo: remove lines
-      /*
-      _ <- ZIO.logInfo(s"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~") *>
-        ZIO.logInfo(s"bodyAsStr = $bodyAsStr") *>
-        ZIO.logInfo(s"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")*/
       u <- ZIO.attempt(bodyAsStr.fromJson[TestModel]).either
       resp <- u match {
         case Left(exp_str) => ZIO.logError(s"Error in input json - ${exp_str.getMessage}") *>
@@ -110,6 +106,49 @@ object WebUiApp {
           }
 
       }
+    } yield resp
+
+
+  def loadTestsExcel(req: Request): ZIO[ImplTestsRepo, Exception, Response] = for {
+    tr <- ZIO.service[ImplTestsRepo]
+    _ <- ZIO.logInfo("GET EXCEL FILE WITH TESTS....................")
+    form  <- req.body.asMultipartForm.mapError {
+      case e: Exception => e
+      case t            => new Exception(t)
+    }
+    resp  <- (form.get("file") match {
+      case Some(FormField.Binary(_, data, contentType, _, filename)) =>
+        ZIO.scoped {
+          ZIO.attemptBlocking(Files.createTempFile("upload-", filename.getOrElse("uploaded") + ".xlsx")).flatMap { tmp =>
+            ZIO.logInfo(s"Temp excel file is = $tmp  contentType=[$contentType]") *>
+            ZIO.attemptBlocking {
+              Files.write(tmp, data.toArray, StandardOpenOption.WRITE)
+            } *> {
+              // Вызов парсера, ожидающего Path
+              for {
+                tm <- ExcelParser.parse(tmp)
+                ri <- tr.create(tm).flatMap {sid =>
+                ZIO.logInfo (s"SID = $sid") *>
+                tr.testsList (sid).map {
+                optTests =>
+                Response.json (RespTestModel (
+                Session (sid),
+                optTests.map {trp => trp.map {testInRepo =>
+                RespTest (testInRepo.id, s"[${testInRepo.id}] ${testInRepo.name}")}}
+              ).toJson)
+              }
+              }.foldZIO(
+                error => ZIO.logError(s"pgt-3 error parsing input file with tests : ${error.getMessage}") *>
+                           ZioResponseMsgBadRequest(error.getMessage),
+                success => ZIO.succeed(success)
+              )
+              } yield ri
+
+            }.ensuring(ZIO.attemptBlocking(Files.deleteIfExists(tmp)).ignore) // по желанию удалить
+          }
+        }
+      case _ => ZioResponseMsgBadRequest("Missing 'file' multipart field")
+    }).refineToOrDie[Exception]
     } yield resp
 
   private def startTestsLogic(testsToRun: TestsToRun): ZIO[Scope with ImplTestsRepo with TestRunner, Exception, Unit] = for {
@@ -174,6 +213,8 @@ object WebUiApp {
         (sid: String, testId: Int, _: Request) => catchCover(getTestInfo(sid, testId))
       },
       Method.POST / "load_test"  -> handler{(req: Request) => catchCover(loadTests(req))},
+      Method.POST / "load_test_excel"  -> handler{(req: Request) => catchCover(loadTestsExcel(req))},
+      //todo: new load_test_excel + loadTestsExcel
       Method.POST / "start_test" -> handler{
         (req: Request) =>
           ZIO.scoped {catchCover(startTests(req))}

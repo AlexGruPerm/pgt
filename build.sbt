@@ -5,12 +5,13 @@ ThisBuild / version      := "0.0.1"
 ThisBuild / scalaVersion := "2.13.16"
 
   val Versions = new {
-    val zio         = "2.1.18"
-    val zio_config  = "4.0.4"
-    val zio_http    = "3.2.0"
-    val zio_json    = "0.7.43"
-    val pgVers      = "42.7.5"
-    val hikari      = "5.1.0"
+    val zio         = "2.1.21"
+    val zio_config  = "4.0.5"
+    val zio_http    = "3.5.1"
+    val zio_json    = "0.7.44"
+    val pgVers      = "42.7.8"
+    val hikari      = "7.0.2"
+    val poi         = "5.4.1"
   }
 
   lazy val global = project
@@ -18,15 +19,36 @@ ThisBuild / scalaVersion := "2.13.16"
   .settings(
     name := "pgt",
     Compile / mainClass := Some("app.MainApp"),
-    assembly / assemblyJarName := "gpt.jar",
+    assembly / assemblyJarName := "pg_test.jar",
     commonSettings,
     libraryDependencies ++= commonDependencies,
     assembly / assemblyMergeStrategy := {
-      case PathList("module-info.class") => MergeStrategy.discard
-      case x if x.endsWith("/module-info.class") => MergeStrategy.discard
-      case PathList("META-INF", xs @ _*)         => MergeStrategy.discard
-      case "reference.conf" => MergeStrategy.concat
-      case _ => MergeStrategy.first
+      //case PathList("module-info.class") => MergeStrategy.discard
+      //case x if x.endsWith("/module-info.class") => MergeStrategy.discard
+      //case PathList("META-INF", xs @ _*)         => MergeStrategy.discard
+      //case "reference.conf" => MergeStrategy.concat
+      //case _ => MergeStrategy.first
+      // Netty versions.properties — берём первый
+      case PathList("META-INF", "io.netty.versions.properties")     => MergeStrategy.first
+      case PathList("META-INF/versions/11/", "module-info.class")   => MergeStrategy.first
+      // Конфиги — склеиваем
+      case PathList("reference.conf")                  => MergeStrategy.concat
+      case PathList("application.conf")                => MergeStrategy.concat
+      case PathList("META-INF", "services", _ @ _*)    => MergeStrategy.filterDistinctLines
+      // Модульные дескрипторы Jigsaw — отбрасываем
+      case PathList("module-info.class")               => MergeStrategy.discard
+      case PathList("META-INF", "versions", _ @ _*)    => MergeStrategy.discard
+      // Стандартные META-INF мусор/подписи — отбрасываем
+      case PathList("META-INF", "MANIFEST.MF")         => MergeStrategy.discard
+      case PathList("META-INF", "INDEX.LIST")          => MergeStrategy.discard
+      case PathList("META-INF", "DEPENDENCIES")        => MergeStrategy.discard
+      case PathList("META-INF", xs @ _*) if xs.nonEmpty && xs.last.toLowerCase.endsWith(".sf")  => MergeStrategy.discard
+      case PathList("META-INF", xs @ _*) if xs.nonEmpty && xs.last.toLowerCase.endsWith(".dsa") => MergeStrategy.discard
+
+      // Остальное по умолчанию
+      case x =>
+        val old = (assembly / assemblyMergeStrategy).value
+        old(x)
     }
   )
 
@@ -43,9 +65,12 @@ ThisBuild / scalaVersion := "2.13.16"
 
       val zioDep = List(zio, zio_conf, zio_conf_typesafe, zio_conf_magnolia, zio_http, zio_json)
 
+      val poi = "org.apache.poi" % "poi" % Versions.poi
+      val poi_ooxml = "org.apache.poi" % "poi-ooxml" % Versions.poi
+
       val pg = "org.postgresql" % "postgresql" % Versions.pgVers
       val hikaricp = "com.zaxxer" % "HikariCP" % Versions.hikari
-      val dbDep = List(pg,hikaricp)
+      val dbDep = List(pg,hikaricp, poi,poi_ooxml)
     }
 
   val commonDependencies = {

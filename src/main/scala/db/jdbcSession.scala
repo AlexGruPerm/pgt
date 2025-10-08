@@ -12,6 +12,7 @@ case class pgSess(sess : Connection){
     val rs: ResultSet = stmt.executeQuery("SELECT pg_backend_pid() as pg_backend_pid")
     rs.next()
     val pg_backend_pid: Int = rs.getInt("pg_backend_pid")
+    println(s"PID = $pg_backend_pid")
     pg_backend_pid
   }.refineToOrDie[SQLException]
 
@@ -60,6 +61,7 @@ object jdbcSessionImpl {
         config.setUsername(testMeta.db_user)
         config.setPassword(testMeta.db_password)
         config.setMaximumPoolSize(1)
+        println(s"createDataSource url = ${testMeta.urlMsg}")
         val hds = new HikariDataSource(config)
         println(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
         println(" ")
@@ -67,7 +69,10 @@ object jdbcSessionImpl {
         println(" ")
         println(" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
         hds
-      }.refineToOrDie[SQLException]
+      }.tapError {
+          case e: Exception => ZIO.logError(s"createDataSource err = ${e.getMessage}")
+        }
+        .refineToOrDie[SQLException]
 
   val layer: ZLayer[TestsMeta, SQLException, jdbcSession] =
     ZLayer.scoped {
